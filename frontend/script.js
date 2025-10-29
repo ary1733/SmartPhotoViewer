@@ -9,21 +9,36 @@ document.addEventListener(
 	false
 );
 
+let pollTimer = null;
+
 async function loadGallery() {
 	const res = await fetch("/list");
 	const items = await res.json();
 	const gallery = document.getElementById("gallery");
 	gallery.innerHTML = "";
 
+	let allReady = true;
+
 	for (const item of items) {
 		const card = document.createElement("div");
 		card.className = "photo-card bg-white p-2";
+
+		if (!item.ready) {
+			allReady = false;
+			const placeholder = document.createElement("div");
+			placeholder.className = "placeholder";
+      fileName = item.image || item.video || "file";
+			placeholder.textContent = `⏳ Processing ${fileName}`;
+			card.appendChild(placeholder);
+			gallery.appendChild(card);
+			continue;
+		}
 
 		const img = document.createElement("img");
 		img.src = `/media/${item.image}`;
 		img.className = "photo-thumb";
 		img.alt = item.image;
-    img.draggable = false; // ✅ prevent iOS drag
+		img.draggable = false; // ✅ prevent iOS drag
 		card.appendChild(img);
 
 		if (item.video) {
@@ -51,11 +66,10 @@ async function loadGallery() {
 					img.style.opacity = "0";
 					video.play();
 					badge.textContent = "LIVING";
-          badge.classList.add("pulse");
+					badge.classList.add("pulse");
 					overlay.classList.remove("active"); // shimmer out
 				}, 150);
 			};
-
 			const stop = () => {
 				video.pause();
 				overlay.classList.add("active");
@@ -63,7 +77,7 @@ async function loadGallery() {
 					video.style.opacity = "0";
 					img.style.opacity = "1";
 					badge.textContent = "LIVE";
-          badge.classList.remove("pulse");
+					badge.classList.remove("pulse");
 					overlay.classList.remove("active");
 				}, 150);
 			};
@@ -78,6 +92,15 @@ async function loadGallery() {
 
 		gallery.appendChild(card);
 	}
+
+	// 🧠 stop polling once everything is ready
+	if (allReady && pollTimer) {
+		clearInterval(pollTimer);
+		pollTimer = null;
+		console.log("✅ All media processed — polling stopped.");
+	}
 }
 
+// Initial load + start polling
 loadGallery();
+pollTimer = setInterval(loadGallery, 10000);
