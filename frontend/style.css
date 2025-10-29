@@ -103,3 +103,21 @@ video {
   pointer-events: auto;
   touch-action: none; /* ✅ prevents iOS drag on long press */
 }
+
+.placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  background: repeating-linear-gradient(
+    45deg,
+    #f3f3f3,
+    #f3f3f3 10px,
+    #e0e0e0 10px,
+    #e0e0e0 20px
+  );
+  color: #555;
+  font-size: 14px;
+  border-radius: 0.75rem;
+  transition: opacity 0.3s ease;
+}

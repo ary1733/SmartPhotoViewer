@@ -28,60 +28,65 @@ def serve_media(filename):
 
 @app.route("/list")
 def list_media():
-    """
-    List photos & videos (JPG/MP4 only).
-    For non-standard formats (.HEIC, .MOV), 
-    check if converted version exists in cache/.
-    """
     files = os.listdir(MEDIA_DIR)
+    # also check cache for converted files
+    files.extend(os.listdir(CACHE_DIR))
+    # unique files only
+    files = list(set(files))
     pairs = []
 
-    # --- Separate by base name ---
     for f in files:
         base, ext = os.path.splitext(f)
         ext = ext.lower()
 
-        # handle direct usable formats
-        if ext in [".jpg", ".jpeg", ".png"]:
+        if ext in [".jpg", ".jpeg"]:
             img_file = f
             video_file = None
 
-            # Look for video with same base (either mp4/mov)
-            for vext in [".mp4", ".mov"]:
+            for vext in [".mp4", ".mov", ".MOV"]:
                 v_candidate = f"{base}{vext}"
                 if (MEDIA_DIR / v_candidate).exists() or (CACHE_DIR / f"{base}.mp4").exists():
                     video_file = f"{base}.mp4" if (CACHE_DIR / f"{base}.mp4").exists() else v_candidate
                     break
 
-            pairs.append({"image": img_file, "video": video_file})
+            pairs.append({"image": img_file, "video": video_file, "ready": True})
+        elif ext in [".mp4"]:
+            video_file = f
+            img_file = None
 
-        elif ext in [".heic"]:
-            # look for cached JPG
-            cached_jpg = f"{base}.jpg"
-            if (CACHE_DIR / cached_jpg).exists():
-                img_file = cached_jpg
-            else:
-                continue  # skip if not yet converted
-            pairs.append({"image": img_file, "video": None})
-
-        elif ext in [".mov"]:
-            # look for cached MP4
-            cached_mp4 = f"{base}.mp4"
-            if (CACHE_DIR / cached_mp4).exists():
-                video_file = cached_mp4
-            else:
-                continue  # skip if not yet converted
-
-            # try to pair with existing image
-            image_file = None
-            for iext in [".jpg", ".jpeg", ".png", ".heic"]:
-                if (MEDIA_DIR / f"{base}{iext}").exists() or (CACHE_DIR / f"{base}.jpg").exists():
-                    image_file = f"{base}.jpg" if (CACHE_DIR / f"{base}.jpg").exists() else f"{base}{iext}"
+            for iext in [".jpg", ".jpeg"]:
+                i_candidate = f"{base}{iext}"
+                if (MEDIA_DIR / i_candidate).exists() or (CACHE_DIR / f"{base}.jpg").exists():
+                    img_file = f"{base}.jpg" if (CACHE_DIR / f"{base}.jpg").exists() else i_candidate
                     break
-            pairs.append({"image": image_file, "video": video_file})
 
+            if img_file is None:
+                pairs.append({"image": img_file, "video": video_file, "ready": False})
+            
+            # else will already be added in the image section
+        elif ext in [".heic", ".mov"]:
+            cached_jpg = f"{base}.jpg"
+            cached_mp4 = f"{base}.mp4"
+
+            img_ready = (CACHE_DIR / cached_jpg).exists()
+            vid_ready = (CACHE_DIR / cached_mp4).exists()
+
+            if ext == ".mov" and not (img_ready and vid_ready):
+                pairs.append({
+                    "image": None,
+                    "video": f,
+                    "ready": img_ready and vid_ready
+                })
+            elif ext in [".heic"] and not img_ready:
+                pairs.append({
+                    "image": f,
+                    "video": None,
+                    "ready": img_ready
+                })
+            # else will be added in the converted sections
     return jsonify(pairs)
 
+# === Background conversion thread ===
 # === Background conversion thread ===
 def background_convert():
     """Run safe threaded conversions in background at startup"""

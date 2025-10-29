@@ -80,12 +80,51 @@ def convert_heic_to_jpg(directory: Path, workers: int = 4):
             logger.info(future.result())
 
 
+def generate_thumbnails(directory: Path, workers: int = 4):
+    cache_dir = get_cache_dir(directory)
+    video_files = list(directory.glob("*.mov")) + list(directory.glob("*.mp4"))
+    logger.info(f"Found {len(video_files)} video files for thumbnail generation.")
+    if not video_files:
+        logger.info("No video files found for thumbnail generation.")
+        return
+    need_thumbnails = []
+    for video_file in video_files:
+        base = video_file.stem
+        cache_thumb = cache_dir / f"{base}.jpg"
+        if not cache_thumb.exists() and not any((directory / f"{base}{ext}").exists() for ext in [".jpg", ".jpeg", ".png", ".heic"]):
+            need_thumbnails.append(video_file)
+    def create_thumbnail(video_file: Path):
+        base = video_file.stem
+        thumb_file = cache_dir / f"{base}.jpg"
+        if thumb_file.exists():
+            return f"⚡ Skipped thumbnail for {video_file.name} (cached)"
+
+        try:
+            ffmpeg_cmd = [
+                "ffmpeg", "-y",
+                "-i", str(video_file),
+                "-ss", "00:00:00.5",
+                "-vframes", "1",
+                str(thumb_file),
+            ]
+            subprocess.run(ffmpeg_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            return f"🎞️ Created thumbnail via ffmpeg for {video_file.name}"
+        except Exception as e:
+            return f"❌ Thumbnail generation failed for {video_file.name}: {e}"
+
+    logger.info(f"🖼️ Generating thumbnails for {len(need_thumbnails)} videos with {workers} threads...")
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        futures = [executor.submit(create_thumbnail, f) for f in need_thumbnails]
+        for future in as_completed(futures):
+            logger.info(future.result())
+
 # === Combined runner ===
 def run_all(directory: str, workers: int = 4):
     directory = Path(directory)
     logger.info(f"🚀 Starting safe parallel conversion in: {directory}")
     convert_heic_to_jpg(directory, workers)
     convert_mov_to_mp4(directory, workers)
+    generate_thumbnails(directory, workers)
     logger.info("🎉 All conversions completed safely in cache.")
 
 
