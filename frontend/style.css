@@ -1,0 +1,21 @@
+.photo-card {
+  position: relative;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  transition: transform 0.2s;
+}
+.photo-card:hover {
+  transform: scale(1.02);
+}
+.live-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(255,215,0,0.9);
+  color: #000;
+  padding: 2px 6px;
+  font-weight: bold;
+  border-radius: 6px;
+  font-size: 12px;
+}
